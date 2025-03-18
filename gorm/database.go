@@ -92,38 +92,45 @@ func NewDatabase(cfg *DBConfig) (db *Database, err error) {
 	return
 }
 
-func (db *Database) RunMigration(ctx context.Context, migrationData *bindata.AssetSource) error {
+func (db *Database) CheckMigration(ctx context.Context, migrationData *bindata.AssetSource) (*migrate.Migrate, error) {
 	sqlDB, _ := db.GormDB.DB()
 	sourceInstance, err := bindata.WithInstance(migrationData)
 	if err != nil {
 		log.Error("read source instance from bindata error: %v", err)
-		return err
+		return nil, err
 	}
 	targetInstance, err := migrate_postgres.WithInstance(sqlDB, &migrate_postgres.Config{})
 	if err != nil {
 		log.Error("init target instance error: %v", err)
-		return err
+		return nil, err
 	}
 	m, err := migrate.NewWithInstance("go-bindata", sourceInstance, "postgres", targetInstance)
 	if err != nil {
 		log.Error("init migration instance error: %v", err)
-		return err
+		return nil, err
 	}
-
 	version, dirty, err := m.Version()
 	if err != nil {
 		if errors.Is(err, migrate.ErrNilVersion) {
 			log.Info("checking current version completed, there is no mogration")
 		} else {
 			log.Error("checking current verion error: %v", err)
-			return err
+			return nil, err
 		}
 	} else {
 		log.Info("schema version before running migration: %d", version)
 		if dirty {
 			log.Warn("current version is dirty, running migrations failed")
-			return err
+			return nil, err
 		}
+	}
+	return m, nil
+}
+
+func (db *Database) RunMigration(ctx context.Context, migrationData *bindata.AssetSource) error {
+	m, err := db.CheckMigration(ctx, migrationData)
+	if err != nil {
+		return err
 	}
 
 	// running migration
