@@ -115,13 +115,13 @@ func (db *Database) CheckMigration(ctx context.Context, migrationData *bindata.A
 			log.Info("checking current version completed, there is no mogration")
 		} else {
 			log.Error("checking current verion error: %v", err)
-			return nil, err
+			return m, err
 		}
 	} else {
 		log.Info("schema version before running migration: %d", version)
 		if dirty {
 			log.Warn("current version is dirty, running migrations failed")
-			return nil, err
+			return m, err
 		}
 	}
 	return m, nil
