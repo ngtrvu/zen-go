@@ -256,6 +256,76 @@ func TestQueryStatement(t *testing.T) {
 			ExpectQueryStr:       "data >= ?",
 			ExpectParams:         []interface{}{time.Date(2024, 1, 24, 13, 56, 28, 0, time.UTC)},
 		},
+		{
+			Desc: "Case 8: OR condition between filters",
+			Query: &gorm.Query{
+				Filter: gorm.Filter{
+					Filters: []*gorm.FilterAttribute{
+						{
+							Field:    "status",
+							Type:     "int",
+							Operator: "=",
+							Value:    1,
+						},
+						{
+							Field:     "user_id",
+							Type:      "uuid",
+							Operator:  "=",
+							Value:     "148afffc-e35b-4aff-b8cc-b59e7b30a24c",
+							LogicalOp: gorm.LogicalOperatorOR,
+						},
+					},
+				},
+			},
+			ExpectFilterQueryStr: "status = ? OR user_id = ?",
+			ExpectFilterParams:   []interface{}{1, "148afffc-e35b-4aff-b8cc-b59e7b30a24c"},
+			ExpectSearchQueryStr: "",
+			ExpcetSearchParams:   []interface{}{},
+			ExpectQueryStr:       "status = ? OR user_id = ?",
+			ExpectParams:         []interface{}{1, "148afffc-e35b-4aff-b8cc-b59e7b30a24c"},
+		},
+		{
+			Desc: "Case 9: Multiple conditions with AND/OR",
+			Query: &gorm.Query{
+				Filter: gorm.Filter{
+					Filters: []*gorm.FilterAttribute{
+						{
+							Field:    "status",
+							Type:     "int",
+							Operator: "=",
+							Value:    1,
+						},
+						{
+							Field:     "user_id",
+							Type:      "uuid",
+							Operator:  "=",
+							Value:     "148afffc-e35b-4aff-b8cc-b59e7b30a24c",
+							LogicalOp: gorm.LogicalOperatorOR,
+						},
+						{
+							Field:     "name",
+							Type:      "string",
+							Operator:  "=",
+							Value:     "test",
+							LogicalOp: gorm.LogicalOperatorAND,
+						},
+						{
+							Field:     "age",
+							Type:      "int",
+							Operator:  ">",
+							Value:     18,
+							LogicalOp: gorm.LogicalOperatorOR,
+						},
+					},
+				},
+			},
+			ExpectFilterQueryStr: "status = ? OR user_id = ? AND name = ? OR age > ?",
+			ExpectFilterParams:   []interface{}{1, "148afffc-e35b-4aff-b8cc-b59e7b30a24c", "test", 18},
+			ExpectSearchQueryStr: "",
+			ExpcetSearchParams:   []interface{}{},
+			ExpectQueryStr:       "status = ? OR user_id = ? AND name = ? OR age > ?",
+			ExpectParams:         []interface{}{1, "148afffc-e35b-4aff-b8cc-b59e7b30a24c", "test", 18},
+		},
 	}
 
 	for _, tc := range testcases {
