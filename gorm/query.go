@@ -35,6 +35,11 @@ const (
 	OperatorIsNotNull    = "IS NOT NULL"
 )
 
+const (
+	LogicalOperatorAND = "AND"
+	LogicalOperatorOR  = "OR"
+)
+
 type Query struct {
 	Limit      int
 	Offset     int
@@ -70,10 +75,11 @@ type Filter struct {
 }
 
 type FilterAttribute struct {
-	Field    string
-	Type     string
-	Operator string
-	Value    interface{}
+	Field     string
+	Type      string
+	Operator  string
+	Value     interface{}
+	LogicalOp string // AND or OR
 }
 
 type SearchAttribute struct {
@@ -112,40 +118,39 @@ func (s *SearchAttribute) QueryStatement() string {
 }
 
 func (f *Filter) QueryStatement() (string, []interface{}) {
+	if len(f.Filters) == 0 {
+		return "", []interface{}{}
+	}
+
 	filterQueries := []string{}
 	params := []interface{}{}
-	for _, fa := range f.Filters {
+
+	for i, fa := range f.Filters {
+		// Build the condition
+		condition := ""
 		if fa.Operator == OperatorIn || fa.Operator == OperatorNotIn {
-			if fa.Type == FieldTypeString {
-				filterQueries = append(filterQueries, fmt.Sprintf("LOWER(%s) %s (?)", fa.Field, fa.Operator))
-				params = append(params, fa.Value)
-			} else {
-				filterQueries = append(filterQueries, fmt.Sprintf("%s %s (?)", fa.Field, fa.Operator))
-				params = append(params, fa.Value)
-			}
+			condition = fmt.Sprintf("%s %s (?)", fa.Field, fa.Operator)
+			params = append(params, fa.Value)
 		} else if fa.Operator == OperatorIsNull || fa.Operator == OperatorIsNotNull {
-			filterQueries = append(filterQueries, fmt.Sprintf("%s %s", fa.Field, fa.Operator))
+			condition = fmt.Sprintf("%s %s", fa.Field, fa.Operator)
 		} else {
-			if fa.Type == FieldTypeString {
-				filterQueries = append(filterQueries, fmt.Sprintf("%s %s ?", fa.Field, fa.Operator))
-				params = append(params, fa.Value)
-			} else if fa.Type == FieldTypeDatetime {
-				filterQueries = append(filterQueries, fmt.Sprintf("%s %s ?", fa.Field, fa.Operator))
-				params = append(params, fa.Value)
+			condition = fmt.Sprintf("%s %s ?", fa.Field, fa.Operator)
+			params = append(params, fa.Value)
+		}
+
+		// Add logical operator if not the first condition
+		if i > 0 {
+			if fa.LogicalOp != "" {
+				filterQueries = append(filterQueries, fa.LogicalOp)
 			} else {
-				filterQueries = append(filterQueries, fmt.Sprintf("%s %s ?", fa.Field, fa.Operator))
-				params = append(params, fa.Value)
+				filterQueries = append(filterQueries, LogicalOperatorAND)
 			}
 		}
+
+		filterQueries = append(filterQueries, condition)
 	}
 
-	filterQueryStr := strings.Join(filterQueries, " AND ")
-	if filterQueryStr != "" {
-		queryStr := filterQueryStr
-		return queryStr, params
-	}
-
-	return "", []interface{}{}
+	return strings.Join(filterQueries, " "), params
 }
 
 func (f *Filter) AddFilter(attr *FilterAttribute) {
